@@ -164,7 +164,7 @@ export class GraphiQL extends React.Component {
       query,
       variables,
       operationName,
-      response: props.response,
+      responses: [props.response],
       editorFlex: Number(this._storageGet('editorFlex')) || 1,
       variableEditorOpen: Boolean(variables),
       variableEditorHeight:
@@ -202,7 +202,7 @@ export class GraphiQL extends React.Component {
     let nextQuery = this.state.query;
     let nextVariables = this.state.variables;
     let nextOperationName = this.state.operationName;
-    let nextResponse = this.state.response;
+    let nextResponses = this.state.responses;
 
     if (nextProps.schema !== undefined) {
       nextSchema = nextProps.schema;
@@ -216,8 +216,8 @@ export class GraphiQL extends React.Component {
     if (nextProps.operationName !== undefined) {
       nextOperationName = nextProps.operationName;
     }
-    if (nextProps.response !== undefined) {
-      nextResponse = nextProps.response;
+    if (nextProps.responses !== undefined) {
+      nextResponses = nextProps.responses;
     }
     if (nextSchema !== this.state.schema ||
         nextQuery !== this.state.query ||
@@ -230,7 +230,7 @@ export class GraphiQL extends React.Component {
       query: nextQuery,
       variables: nextVariables,
       operationName: nextOperationName,
-      response: nextResponse,
+      responses: nextResponses,
     });
   }
 
@@ -283,6 +283,8 @@ export class GraphiQL extends React.Component {
     const variableStyle = {
       height: variableOpen ? this.state.variableEditorHeight : null
     };
+
+    const numResponses = this.state.responses.length
 
     return (
       <div className="graphiql-container">
@@ -349,10 +351,15 @@ export class GraphiQL extends React.Component {
                   <div className="spinner" />
                 </div>
               }
-              <ResultViewer
-                ref={c => { this.resultComponent = c; }}
-                value={this.state.response}
-              />
+              <div style={{height: '100%', overflowY: 'scroll'}}>
+                {this.state.responses.map(res =>
+                  <ResultViewer
+                    key={res}
+                    ref={c => { this.resultComponent = c; }}
+                    value={res}
+                  />
+                )}
+              </div>
               {footer}
             </div>
           </div>
@@ -429,7 +436,7 @@ export class GraphiQL extends React.Component {
     const fetch = observableToPromise(fetcher({ query: introspectionQuery }));
     if (!isPromise(fetch)) {
       this.setState({
-        response: 'Fetcher did not return a Promise for introspection.'
+        responses: ['Fetcher did not return a Promise for introspection.']
       });
       return;
     }
@@ -464,10 +471,10 @@ export class GraphiQL extends React.Component {
         const responseString = typeof result === 'string' ?
           result :
           JSON.stringify(result, null, 2);
-        this.setState({ response: responseString });
+        this.setState({ responses: [responseString] });
       }
     }).catch(error => {
-      this.setState({ response: error && String(error.stack || error) });
+      this.setState({ responses: [error && String(error.stack || error)] });
     });
   }
 
@@ -508,29 +515,30 @@ export class GraphiQL extends React.Component {
       fetch.then(cb).catch(error => {
         this.setState({
           isWaitingForResponse: false,
-          response: error && String(error.stack || error)
+          responses: [error && String(error.stack || error)]
         });
       });
     } else if (isObservable(fetch)) {
       // If the fetcher returned an Observable, then subscribe to it, calling
       // the callback on each next value, and handling both errors and the
       // completion of the Observable. Returns a Subscription object.
-      const subscription = fetch.subscribe({
-        next: cb,
-        error: error => {
+      const subscription = fetch.subscribe(res => {
+          cb(res, true)
+        },
+        error => {
           this.setState({
             isWaitingForResponse: false,
-            response: error && String(error.stack || error),
+            responses: [error && String(error.stack || error)],
             subscription: null
           });
         },
-        complete: () => {
+        () => {
           this.setState({
             isWaitingForResponse: false,
             subscription: null
           });
         }
-      });
+      );
 
       return subscription;
     } else {
@@ -562,7 +570,7 @@ export class GraphiQL extends React.Component {
     try {
       this.setState({
         isWaitingForResponse: true,
-        response: null,
+        responses: [null],
         operationName,
       });
 
@@ -571,11 +579,19 @@ export class GraphiQL extends React.Component {
         editedQuery,
         variables,
         operationName,
-        result => {
+        (result, isSubscription) => {
           if (queryID === this._editorQueryID) {
+            let responses
+            let response = JSON.stringify(result, null, 2)
+
+            if (isSubscription) {
+              responses = this.state.responses.concat(response)
+            } else {
+              responses = [response]
+            }
             this.setState({
               isWaitingForResponse: false,
-              response: JSON.stringify(result, null, 2),
+              responses
             });
           }
         }
@@ -585,7 +601,7 @@ export class GraphiQL extends React.Component {
     } catch (error) {
       this.setState({
         isWaitingForResponse: false,
-        response: error.message
+        responses: [error.message]
       });
     }
   }
@@ -597,7 +613,11 @@ export class GraphiQL extends React.Component {
       subscription: null
     });
     if (subscription) {
-      subscription.unsubscribe();
+      if (typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      } else if (typeof subscription.dispose === 'function') {
+        subscription.dispose();
+      }
     }
   }
 

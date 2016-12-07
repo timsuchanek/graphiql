@@ -1,4 +1,5 @@
 *.swp
+.idea
 *~
 .*.haste_cache.*
 .DS_Store

@@ -145,6 +145,14 @@
           flex-direction: column;
 }
 
+.graphiql-container .resultWrap .result-window {
+  height: auto;
+}
+
+.graphiql-container .resultWrap .CodeMirror {
+  position: relative;
+}
+
 .graphiql-container .docExplorerWrap {
   background: white;
   box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);

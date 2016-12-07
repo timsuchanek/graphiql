@@ -22,7 +22,8 @@ import ReactDOM from 'react-dom';
  */
 export class ResultViewer extends React.Component {
   static propTypes = {
-    value: PropTypes.string
+    value: PropTypes.string,
+    style: PropTypes.any
   }
 
   componentDidMount() {
@@ -70,7 +71,7 @@ export class ResultViewer extends React.Component {
   }
 
   render() {
-    return <div className="result-window" />;
+    return <div className="result-window" style={this.props.style || {}} />;
   }
 
   /**
